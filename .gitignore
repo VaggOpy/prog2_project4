@@ -1,0 +1,9 @@
+# executables
+*.exe
+project4
+
+# pdf files
+*.pdf
+
+# folders
+secure_save
