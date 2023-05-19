@@ -6,7 +6,6 @@ project4
 *.pdf
 
 # folders
-secure_save
 .vscode
 
 # testfiles
