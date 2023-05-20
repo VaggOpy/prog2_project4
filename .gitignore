@@ -1,6 +1,7 @@
 # executables
 *.exe
 project4
+p4diff
 
 # pdf files
 *.pdf
