@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     strcpy(testfile_output, argv[4]);
     unsigned int timeout = atoi(argv[5]);
 
-    int status, check, compilation_successful, compilation = 0;
+    int status, check, compilation_successful, compilation = 0, score;
     int termination = 0, in_out_difference = 0, memory_access = 0;
 
     strncpy(testfile_name, testfile_c, strlen(testfile_c)-2);
@@ -92,6 +92,7 @@ int main(int argc, char *argv[]) {
     else { // compilation successful
         compilation_successful = 1;
         compilation += count_occurrences(error_string, " warning: ") * -5;
+        if (compilation < -100) compilation = -100;
     }
     free(error_string);
 
@@ -163,9 +164,13 @@ int main(int argc, char *argv[]) {
         close(fd[1]);
         waitpid(p2, &status, 0);
         waitpid(p3, &status, 0);
-
-
     }
+    in_out_difference = WEXITSTATUS(status);
+    score = compilation + termination + in_out_difference + memory_access;
+    if (score < 0) score = 0;
+
+    printf("\nCompilation: %d\n\nTermination: %d\n\nOutput: %d\n\nMemory access: %d\n\nScore: %d\n", 
+        compilation, termination, in_out_difference, memory_access, score);
 
     return 0;
 }

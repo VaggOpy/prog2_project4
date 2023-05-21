@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define BLOCK 64
 
@@ -14,24 +15,50 @@ void system_call_failure(int variable) {
     }
 }
 
+int find_max(int num1, int num2) {
+    if (num1 > num2) return num1;
+    return num2;
+}
+
+char *myread(char str[BLOCK], int **count_bytes_read, FILE *stream) {
+    int check = fread(str, BLOCK, BLOCK, stream);
+    *count_bytes_read += check;
+
+    if (check < BLOCK) str[check] = '\0';
+    if (check == 0) {
+        char new[BLOCK] = {'\0'};
+        strcpy(str, new);
+    }
+
+    return str;
+}
+
 int main(int argc, char *argv[]) {
-    char *correct_output_file = argv[1], pipe_read[BLOCK], correct_output_read[BLOCK];
-    int total_same_bytes = 0;
+    char pipe_read[BLOCK], expected_read[BLOCK], str1[BLOCK], str2[BLOCK];
+    int *total_expected_bytes = (int *) malloc(sizeof(int)), matching_bytes = 0;
+    int *total_pipe_bytes = (int *) malloc(sizeof(int)), max;
+    *total_expected_bytes = 0, *total_pipe_bytes = 0;
 
-    FILE *correct_output_fd = fopen(correct_output_file, "r");
-    if (correct_output_fd == NULL) return -1;
+    FILE *expected_out_fd = fopen(argv[1], "r");
+    if (expected_out_fd == NULL) return -1;
 
-    // Counts how many same bytes <progname>.out and <progname> 's output have
-    while (fgets(pipe_read, BLOCK, stdin) != NULL) {
-        if (fgets(correct_output_read, BLOCK, correct_output_fd) == NULL) break;
-        for (int i = 0; i < BLOCK && (correct_output_read[i] != '\0' &&
-                                      pipe_read[i] != '\0'); i++) {
-            if (correct_output_read[i] == pipe_read[i]) total_same_bytes++; 
+    // Counts how many similar bytes <progname>.out and the pipe have
+    while (1) {
+        strcpy(pipe_read, myread(str1, &total_pipe_bytes, stdin));
+        strcpy(expected_read, myread(str2, &total_expected_bytes, expected_out_fd));
+
+        printf("%s %s", pipe_read, expected_read);
+        for (int i = 0; i < BLOCK && (pipe_read[i] != '\0'); i++) {
+            if (pipe_read[i] == expected_read[i]) matching_bytes++; 
         }
     }
-    fclose(correct_output_fd);
+    fclose(expected_out_fd);
 
-    printf("%d\n", total_same_bytes);
+    max = find_max(*total_expected_bytes, *total_pipe_bytes);
+    free(total_expected_bytes);
+    free(total_pipe_bytes);
 
-    return 0;
+    // printf("mybytes:%d expected_bytes:%d same:%d max:%d\n", total_pipe_bytes, total_expected_bytes, matching_bytes, max);
+    if (max == 0) return 0;
+    return matching_bytes*100 / max;
 }
