@@ -20,18 +20,6 @@ int find_max(int num1, int num2) {
     return num2;
 }
 
-// char *myread(char str[BLOCK+1], int *count_bytes_read, FILE *stream) {
-//     int check = fread(str, sizeof(char), 1, stream);
-//     *count_bytes_read += check;
-
-//     if (check <= BLOCK) str[check] = '\0';
-//     if (check == 0) {
-//         char new[BLOCK+1] = {'\0'};
-//         strcpy(str, new);
-//     }
-
-//     return str;
-// }
 char *myread(char str[BLOCK+1], int *count_bytes_read, FILE *stream) {
     char *character = malloc(sizeof(char));
     int check, i;
@@ -73,8 +61,6 @@ int main(int argc, char *argv[]) {
         strcpy(expected_read, myread(str2, total_expected_bytes, expected_out_fd));
         if (pipe_read[0] == '\0') break;
 
-        // printf("%c", expected_read[BLOCK-1]);
-        // printf("%s\n%s\n", pipe_read, expected_read);
         for (int i = 0; i < BLOCK && (pipe_read[i] != '\0'); i++) {
             if (pipe_read[i] == expected_read[i]) matching_bytes++; 
         }
@@ -82,9 +68,7 @@ int main(int argc, char *argv[]) {
     fclose(expected_out_fd);
 
     max = find_max(*total_expected_bytes, *total_pipe_bytes);
-    printf("mybytes:%d expected_bytes:%d same:%d max:%d\n", *total_pipe_bytes, *total_expected_bytes, matching_bytes, max);
-    printf("%d\n", matching_bytes*100 / max);
-
+    // printf("mybytes:%d expected_bytes:%d same:%d max:%d\n", *total_pipe_bytes, *total_expected_bytes, matching_bytes, max);
     free(total_expected_bytes);
     free(total_pipe_bytes);
 
