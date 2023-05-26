@@ -21,28 +21,17 @@ int find_max(int num1, int num2) {
 }
 
 char *myread(char str[BLOCK+1], int *count_bytes_read, FILE *stream) {
-    char *character = malloc(sizeof(char));
-    int check, i;
+    int check = fread(str, sizeof(char), BLOCK, stream);
+    system_call_failure(check);
 
-    for (i = 0; i < BLOCK; i++) {
-        check = fread(character, sizeof(char), 1, stream);
-        if (check == 0) break;
-        if (*character == '\r') {
-            i--;
-            continue;
-        }
-
-        str[i] = *character;
-        (*count_bytes_read)++;
-    }
-
-    if (i <= BLOCK) str[i] = '\0';
-    if (i == 0) {
+    if (check == 0) {
         char new[BLOCK+1] = {'\0'};
         strcpy(str, new);
     }
-
-    free(character);
+    else {
+        *count_bytes_read += check;
+        str[check] = '\0';
+    }
     return str;
 }
 
@@ -52,7 +41,7 @@ int main(int argc, char *argv[]) {
     if (expected_out_fd == NULL) return -1;
 
     int *total_expected_bytes = (int *) malloc(sizeof(int)), matching_bytes = 0;
-    int *total_pipe_bytes = (int *) malloc(sizeof(int)), max;
+    int *total_pipe_bytes = (int *) malloc(sizeof(int)), max, check;
     *total_expected_bytes = 0, *total_pipe_bytes = 0;
 
     // Counts how many similar bytes <progname>.out and the pipe have
@@ -65,10 +54,10 @@ int main(int argc, char *argv[]) {
             if (pipe_read[i] == expected_read[i]) matching_bytes++; 
         }
     }
-    fclose(expected_out_fd);
+    check = fclose(expected_out_fd);
+    system_call_failure(check);
 
     max = find_max(*total_expected_bytes, *total_pipe_bytes);
-    // printf("mybytes:%d expected_bytes:%d same:%d max:%d\n", *total_pipe_bytes, *total_expected_bytes, matching_bytes, max);
     free(total_expected_bytes);
     free(total_pipe_bytes);
 

@@ -5,7 +5,9 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 #define NAMESIZE 255
 
@@ -26,6 +28,12 @@ void system_call_failure(int variable) {
         perror("System call failed.\n");
         exit(1);
     }
+}
+
+pid_t p2;
+
+void time_handler(int signum) {
+    kill(p2, SIGKILL);
 }
 
 int main(int argc, char *argv[]) {
@@ -100,7 +108,7 @@ int main(int argc, char *argv[]) {
         int fd[2];
         pipe(fd);
 
-        int p2 = fork();
+        p2 = fork();
         if (p2 == 0) {
             int testfile_input_fd = open(testfile_input, O_RDWR, 0644);
             system_call_failure(testfile_input_fd);
@@ -111,8 +119,10 @@ int main(int argc, char *argv[]) {
             
             check = dup2(fd[1], STDOUT_FILENO);
             system_call_failure(check);
-            close(fd[0]);
-            close(fd[1]);
+            check = close(fd[0]);
+            system_call_failure(check);
+            check = close(fd[1]);
+            system_call_failure(check);
 
             int testfile_args_fd = open(testfile_args, O_RDWR, 0644);
             system_call_failure(testfile_args_fd);
@@ -146,6 +156,8 @@ int main(int argc, char *argv[]) {
 
             // if execv is succesful i don't need to free(args) because p2 dies and memory gets freed
             execv(testfile_name, args);
+
+            perror("Execv failed.\n");
             exit(0);
         }
 
@@ -153,19 +165,53 @@ int main(int argc, char *argv[]) {
         if (p3 == 0) {
             check = dup2(fd[0], STDIN_FILENO);
             system_call_failure(check);
-            close(fd[0]);
-            close(fd[1]);
+            check = close(fd[0]);
+            system_call_failure(check);
+            check = close(fd[1]);
+            system_call_failure(check);
 
             execlp("./p4diff", "./p4diff", testfile_output, NULL);
+
+            perror("Execlp failed.\n");
             exit(0);
         }
 
-        close(fd[0]);
-        close(fd[1]);
+        struct sigaction action = {{0}};
+        struct itimerval timer = {{0}};
+
+        action.sa_handler = time_handler;
+        sigaction(SIGALRM, &action, NULL);
+
+        timer.it_value.tv_sec = timeout;       
+        timer.it_value.tv_usec = 0;
+        timer.it_interval.tv_sec = 0;
+        timer.it_interval.tv_usec = 0;
+
+        if (setitimer(ITIMER_REAL, &timer, NULL) == -1) {
+            perror("setitimer");
+            exit(EXIT_FAILURE);
+        }
+
+        signal(SIGALRM, time_handler);
+        
+        check = close(fd[0]);
+        system_call_failure(check);
+        check = close(fd[1]);
+        system_call_failure(check);
         waitpid(p2, &status, 0);
+
+        // Shut down timer
+        timer.it_value.tv_sec = 0;
+        timer.it_value.tv_usec = 0;
+        setitimer(ITIMER_REAL, &timer, NULL);
+
+        if (WTERMSIG(status) == SIGKILL) termination = -100;
+        else if (WTERMSIG(status) == SIGSEGV || WTERMSIG(status) == SIGABRT || 
+            WTERMSIG(status) == SIGBUS) memory_access -= 15;
         waitpid(p3, &status, 0);
     }
-    in_out_difference = WEXITSTATUS(status);
+    if (WIFEXITED(status)) in_out_difference = WEXITSTATUS(status);
+
     score = compilation + termination + in_out_difference + memory_access;
     if (score < 0) score = 0;
 
