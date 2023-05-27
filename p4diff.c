@@ -21,17 +21,14 @@ int find_max(int num1, int num2) {
 }
 
 char *myread(char str[BLOCK+1], int *count_bytes_read, FILE *stream) {
+    for (int i = 0; i <= BLOCK; i++) str[i] = '\0';
+
     int check = fread(str, sizeof(char), BLOCK, stream);
     system_call_failure(check);
 
-    if (check == 0) {
-        char new[BLOCK+1] = {'\0'};
-        strcpy(str, new);
-    }
-    else {
-        *count_bytes_read += check;
-        str[check] = '\0';
-    }
+    *count_bytes_read += check;
+    str[check] = '\0';
+
     return str;
 }
 
@@ -46,21 +43,29 @@ int main(int argc, char *argv[]) {
 
     // Counts how many similar bytes <progname>.out and the pipe have
     while (1) {
+        for (int i = 0; i <= BLOCK; i++) {
+            pipe_read[i] = '\0';
+            expected_read[i] = '\0';
+        }
+
         strcpy(pipe_read, myread(str1, total_pipe_bytes, stdin));
         strcpy(expected_read, myread(str2, total_expected_bytes, expected_out_fd));
-        if (pipe_read[0] == '\0') break;
+        if (pipe_read[0] == '\0' && expected_read[0] == '\0') break;
 
-        for (int i = 0; i < BLOCK && (pipe_read[i] != '\0'); i++) {
-            if (pipe_read[i] == expected_read[i]) matching_bytes++; 
+        for (int i = 0; i <= BLOCK && pipe_read[i] != '\0'; i++) {
+            if (pipe_read[i] == expected_read[i]) {
+                matching_bytes++;
+            }
         }
     }
     check = fclose(expected_out_fd);
     system_call_failure(check);
 
     max = find_max(*total_expected_bytes, *total_pipe_bytes);
+    // printf("total_pipe: %d, total_expected: %d, matching: %d", *total_pipe_bytes, *total_expected_bytes, matching_bytes);
     free(total_expected_bytes);
     free(total_pipe_bytes);
 
-    if (max == 0) return 0;
+    if (max == 0) return 100;
     return matching_bytes*100 / max;
 }

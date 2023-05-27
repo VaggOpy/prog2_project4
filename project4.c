@@ -100,7 +100,6 @@ int main(int argc, char *argv[]) {
     else { // compilation successful
         compilation_successful = 1;
         compilation += count_occurrences(error_string, " warning: ") * -5;
-        if (compilation < -100) compilation = -100;
     }
     free(error_string);
 
@@ -207,10 +206,10 @@ int main(int argc, char *argv[]) {
 
         if (WTERMSIG(status) == SIGKILL) termination = -100;
         else if (WTERMSIG(status) == SIGSEGV || WTERMSIG(status) == SIGABRT || 
-            WTERMSIG(status) == SIGBUS) memory_access -= 15;
+            WTERMSIG(status) == SIGBUS) memory_access = -15;
         waitpid(p3, &status, 0);
     }
-    if (WIFEXITED(status)) in_out_difference = WEXITSTATUS(status);
+    if (WIFEXITED(status) && compilation_successful) in_out_difference = WEXITSTATUS(status);
 
     score = compilation + termination + in_out_difference + memory_access;
     if (score < 0) score = 0;
