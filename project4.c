@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
     system_call_failure(check);
     free(err_out_file);
 
-    if (strstr(error_string, " error: ") != NULL) {
+    if (strstr(error_string, ": error: ") != NULL) {
         compilation_successful = 0;
         compilation = -100;
     }
@@ -123,35 +123,31 @@ int main(int argc, char *argv[]) {
             check = close(fd[1]);
             system_call_failure(check);
 
-            int testfile_args_fd = open(testfile_args, O_RDWR, 0644);
-            system_call_failure(testfile_args_fd);
-            int total_args = 0, letter = 0;
-            char **args = (char **) malloc(sizeof(char *)), character;
-            args[0] = (char *) malloc(sizeof(char));
+            FILE *testfile_args_fd = fopen(testfile_args, "r");
+            if (testfile_args_fd == NULL) {
+                perror("fopen failed.\n");
+                exit(2);
+            }
+
+            // FILE* writeStream = fdopen(fd[1], "w");
+            // setvbuf(writeStream, NULL, _IONBF, 0);
+            char **args = (char **) malloc(sizeof(char *) * 2);
+            int total_args = 0;
 
             // moves every argument from progname.args to char **args
             while (1) {
-                check = read(testfile_args_fd, &character, sizeof(char));
-                system_call_failure(check);
-                if (check == 0) break; 
+                char *str = NULL;    
+                fscanf(testfile_args_fd, "%ms", &str);
+                if (str == NULL) break;
 
-                if (character == ' ') {
-                    args[total_args][letter] = '\0';
-                    total_args++;
-                    letter = 0;
-                    char **args1 = (char **) realloc(args, sizeof(char *) * (total_args+1));
-                    if (args1 == NULL) exit(2);
-                    args = args1;
-
-                    args[total_args] = (char *) malloc(sizeof(char));
-                }
-                else if (character == '\n') break;
-
-                args[total_args][letter] = character;
-                letter++;
-                args[total_args] = (char *) realloc(args[total_args], sizeof(char) * (letter+1));
+                char **args1 = (char **) realloc(args, sizeof(char *) * (total_args + 2));
+                if (args1 == NULL) exit(2);
+                args = args1;
+                args[total_args] = str;
+                total_args++;
             }
-            args[total_args][letter] = '\0';
+            // if (total_args == 1) args[total_args] = NULL;
+            args[total_args] = NULL;
 
             // if execv is succesful i don't need to free(args) because p2 dies and memory gets freed
             execv(testfile_name, args);
@@ -204,12 +200,17 @@ int main(int argc, char *argv[]) {
         timer.it_value.tv_usec = 0;
         setitimer(ITIMER_REAL, &timer, NULL);
 
-        if (WTERMSIG(status) == SIGKILL) termination = -100;
+        if (WTERMSIG(status) == SIGKILL) { 
+            termination = -100;
+            // in_out_difference = 100;
+        }
         else if (WTERMSIG(status) == SIGSEGV || WTERMSIG(status) == SIGABRT || 
             WTERMSIG(status) == SIGBUS) memory_access = -15;
         waitpid(p3, &status, 0);
     }
+    // if (in_out_difference != 100) {
     if (WIFEXITED(status) && compilation_successful) in_out_difference = WEXITSTATUS(status);
+    // }
 
     score = compilation + termination + in_out_difference + memory_access;
     if (score < 0) score = 0;
