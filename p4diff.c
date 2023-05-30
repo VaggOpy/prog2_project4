@@ -54,7 +54,6 @@ int main(int argc, char *argv[]) {
     system_call_failure(check);
 
     max = find_max(total_pipe_bytes, total_output_bytes);
-    // printf("total_pipe: %d, total_expected: %d, matching: %d", total_pipe_bytes, total_output_bytes, matching_bytes);
     free(num_out);
     free(num_pipe);
 

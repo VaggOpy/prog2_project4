@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
             system_call_failure(check);
             check = close(testfile_input_fd);
             system_call_failure(check);
-            
+
             check = dup2(fd[1], STDOUT_FILENO);
             system_call_failure(check);
             check = close(fd[0]);
@@ -129,27 +129,23 @@ int main(int argc, char *argv[]) {
                 exit(2);
             }
 
-            // FILE* writeStream = fdopen(fd[1], "w");
-            // setvbuf(writeStream, NULL, _IONBF, 0);
-            char **args = (char **) malloc(sizeof(char *) * 2);
-            int total_args = 0;
+            char **args = (char **) malloc(sizeof(char *));
+            args[0] = testfile_name;
+            int total_args = 1, result;
 
             // moves every argument from progname.args to char **args
             while (1) {
-                char *str = NULL;    
-                fscanf(testfile_args_fd, "%ms", &str);
-                if (str == NULL) break;
-
-                char **args1 = (char **) realloc(args, sizeof(char *) * (total_args + 2));
+                char **args1 = (char **) realloc(args, sizeof(char *) * (total_args + 1));
                 if (args1 == NULL) exit(2);
                 args = args1;
-                args[total_args] = str;
+
+                result = fscanf(testfile_args_fd, "%ms", &args[total_args]);
+                if (result == EOF) break;
                 total_args++;
             }
-            // if (total_args == 1) args[total_args] = NULL;
             args[total_args] = NULL;
 
-            // if execv is succesful i don't need to free(args) because p2 dies and memory gets freed
+            // on execv success i don't have to free(args) because p2 dies and memory gets freed
             execv(testfile_name, args);
 
             perror("Execv failed.\n");
@@ -186,13 +182,7 @@ int main(int argc, char *argv[]) {
             perror("setitimer");
             exit(EXIT_FAILURE);
         }
-
         signal(SIGALRM, time_handler);
-        
-        check = close(fd[0]);
-        system_call_failure(check);
-        check = close(fd[1]);
-        system_call_failure(check);
         waitpid(p2, &status, 0);
 
         // Shut down timer
@@ -200,17 +190,22 @@ int main(int argc, char *argv[]) {
         timer.it_value.tv_usec = 0;
         setitimer(ITIMER_REAL, &timer, NULL);
 
-        if (WTERMSIG(status) == SIGKILL) { 
-            termination = -100;
-            // in_out_difference = 100;
+        if (WIFSIGNALED(status)) {
+            if (WTERMSIG(status) == SIGKILL) termination = -100;
+            if (WTERMSIG(status) == SIGSEGV || WTERMSIG(status) == SIGABRT || 
+                WTERMSIG(status) == SIGBUS) {
+                fsync(fd[1]);
+                memory_access = -15;
+            }
         }
-        else if (WTERMSIG(status) == SIGSEGV || WTERMSIG(status) == SIGABRT || 
-            WTERMSIG(status) == SIGBUS) memory_access = -15;
+        check = close(fd[0]);
+        system_call_failure(check);
+        check = close(fd[1]);
+        system_call_failure(check);
+
         waitpid(p3, &status, 0);
     }
-    // if (in_out_difference != 100) {
     if (WIFEXITED(status) && compilation_successful) in_out_difference = WEXITSTATUS(status);
-    // }
 
     score = compilation + termination + in_out_difference + memory_access;
     if (score < 0) score = 0;
