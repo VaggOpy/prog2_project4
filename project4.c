@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <errno.h>
 
 #define NAMESIZE 255
 
@@ -30,10 +31,7 @@ void system_call_failure(int variable) {
     }
 }
 
-pid_t p2;
-
 void time_handler(int signum) {
-    kill(p2, SIGKILL);
 }
 
 int main(int argc, char *argv[]) {
@@ -107,7 +105,7 @@ int main(int argc, char *argv[]) {
         int fd[2];
         pipe(fd);
 
-        p2 = fork();
+        int p2 = fork();
         if (p2 == 0) {
             int testfile_input_fd = open(testfile_input, O_RDWR, 0644);
             system_call_failure(testfile_input_fd);
@@ -182,8 +180,12 @@ int main(int argc, char *argv[]) {
             perror("setitimer");
             exit(EXIT_FAILURE);
         }
-        signal(SIGALRM, time_handler);
-        waitpid(p2, &status, 0);
+        int failed = waitpid(p2, &status, 0);
+
+        if (failed == -1 && errno == EINTR) {
+            kill(p2, SIGKILL);
+            termination = -100;
+        }
 
         // Shut down timer
         timer.it_value.tv_sec = 0;
@@ -191,7 +193,6 @@ int main(int argc, char *argv[]) {
         setitimer(ITIMER_REAL, &timer, NULL);
 
         if (WIFSIGNALED(status)) {
-            if (WTERMSIG(status) == SIGKILL) termination = -100;
             if (WTERMSIG(status) == SIGSEGV || WTERMSIG(status) == SIGABRT || 
                 WTERMSIG(status) == SIGBUS) {
                 fsync(fd[1]);
@@ -205,7 +206,9 @@ int main(int argc, char *argv[]) {
 
         waitpid(p3, &status, 0);
     }
-    if (WIFEXITED(status) && compilation_successful) in_out_difference = WEXITSTATUS(status);
+    if (WIFEXITED(status) && compilation_successful) {
+        in_out_difference = WEXITSTATUS(status);
+    }   
 
     score = compilation + termination + in_out_difference + memory_access;
     if (score < 0) score = 0;
